@@ -5,7 +5,7 @@ import (
 
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 )
@@ -46,6 +46,7 @@ func main() {
 			retrievalDealsCmd,
 			indexProvCmd,
 			importDataCmd,
+			//importDirectDataCmd,
 			logCmd,
 			dagstoreCmd,
 			netCmd,
@@ -73,6 +74,7 @@ func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("piecedoc", "INFO")
 	_ = logging.SetLogLevel("piecedirectory", "INFO")
 	_ = logging.SetLogLevel("sectorstatemgr", "INFO")
+	_ = logging.SetLogLevel("migrations", "INFO")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd", "DEBUG")

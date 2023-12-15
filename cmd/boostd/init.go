@@ -15,11 +15,11 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	scliutil "github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/util"
-	scliutil "github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/go-address"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
@@ -110,6 +110,24 @@ var initCmd = &cli.Command{
 		}
 		if err != nil {
 			return fmt.Errorf("setting config: %w", err)
+		}
+
+		// Add comments to config
+		c, err := lr.Config()
+		if err != nil {
+			return fmt.Errorf("getting config: %w", err)
+		}
+		curCfg, ok := c.(*config.Boost)
+		if !ok {
+			return fmt.Errorf("parsing config from boost repo")
+		}
+		newCfg, err := config.ConfigUpdate(curCfg, config.DefaultBoost(), true, false)
+		if err != nil {
+			return err
+		}
+		err = os.WriteFile(path.Join(lr.Path(), "config.toml"), newCfg, 0644)
+		if err != nil {
+			return fmt.Errorf("writing config file %s: %w", string(newCfg), err)
 		}
 
 		// Add the miner address to the metadata datastore

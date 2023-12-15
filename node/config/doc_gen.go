@@ -86,6 +86,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "HttpDownload",
+			Type: "HttpDownloadConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -436,6 +442,15 @@ them disabled. These will be completely deprecated soon.`,
 The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
 ignored, and deals will remain in the pending state until manually published.`,
 		},
+		{
+			Name: "GraphsyncStorageAccessApiInfo",
+			Type: "[]string",
+
+			Comment: `The connect strings for the RPC APIs of each miner that boost can read
+sector data from when serving graphsync retrievals.
+If this parameter is not set, boost will serve data from the endpoint
+configured in SectorIndexApiInfo.`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
@@ -463,6 +478,23 @@ ignored, and deals will remain in the pending state until manually published.`,
 			Type: "uint64",
 
 			Comment: `The port that the graphql server listens on`,
+		},
+	},
+	"HttpDownloadConfig": []DocField{
+		{
+			Name: "NChunks",
+			Type: "int",
+
+			Comment: `NChunks is a number of chunks to split HTTP downloads into. Each chunk is downloaded in the goroutine of its own
+which improves the overall download speed. NChunks is always equal to 1 for libp2p transport because libp2p server
+doesn't support range requests yet. NChunks must be greater than 0 and less than 16, with the default of 5.`,
+		},
+		{
+			Name: "AllowPrivateIPs",
+			Type: "bool",
+
+			Comment: `AllowPrivateIPs defines whether boost should allow HTTP downloads from private IPs as per https://en.wikipedia.org/wiki/Private_network.
+The default is false.`,
 		},
 	},
 	"IndexProviderAnnounceConfig": []DocField{
@@ -543,13 +575,22 @@ datastore if any is present.`,
 
 			Comment: ``,
 		},
+		{
+			Name: "DataTransferPublisher",
+			Type: "bool",
+
+			Comment: `Set this to true to use the legacy data-transfer/graphsync publisher.
+This should only be used as a temporary fall-back if publishing ipnisync
+over libp2p or HTTP is not working, and publishing over
+data-transfer/graphsync was previously working.`,
+		},
 	},
 	"IndexProviderHttpPublisherConfig": []DocField{
 		{
 			Name: "Enabled",
 			Type: "bool",
 
-			Comment: `If not enabled, requests are served over graphsync instead.`,
+			Comment: `If enabled, requests are served over HTTP instead of libp2p.`,
 		},
 		{
 			Name: "PublicHostname",
@@ -566,11 +607,25 @@ This is usually the same as the for the boost node.`,
 			Comment: `Set the port on which to listen for index provider requests over HTTP.
 Note that this port must be open on the firewall.`,
 		},
+		{
+			Name: "WithLibp2p",
+			Type: "bool",
+
+			Comment: `Set this to true to publish HTTP over libp2p in addition to plain HTTP,
+Otherwise, the publisher will publish content advertisements using only
+plain HTTP if Enabled is true.`,
+		},
 	},
 	"LocalIndexDirectoryConfig": []DocField{
 		{
 			Name: "Yugabyte",
 			Type: "LocalIndexDirectoryYugabyteConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Leveldb",
+			Type: "LocalIndexDirectoryLeveldbConfig",
 
 			Comment: ``,
 		},
@@ -582,6 +637,13 @@ Note that this port must be open on the firewall.`,
 The add index operation is executed when a new deal is created - it fetches
 the piece from the sealing subsystem, creates an index of where each block
 is in the piece, and adds the index to the local index directory.`,
+		},
+		{
+			Name: "AddIndexConcurrency",
+			Type: "int",
+
+			Comment: `AddIndexConcurrency sets the number of concurrent tasks that each add index operation is split into.
+This setting is usefull to better utilise bandwidth between boostd and boost-data. The default value is 8.`,
 		},
 		{
 			Name: "EmbeddedServicePort",
@@ -603,6 +665,14 @@ Set this value to "" if the local index directory data service is embedded.`,
 			Type: "Duration",
 
 			Comment: `The RPC timeout when making requests to the boostd-data service`,
+		},
+	},
+	"LocalIndexDirectoryLeveldbConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: ``,
 		},
 	},
 	"LocalIndexDirectoryYugabyteConfig": []DocField{
@@ -1186,6 +1256,35 @@ the database must already exist and be writeable. If a relative path is provided
 relative to the CWD (current working directory).`,
 		},
 	},
+	"lotus_config.FaultReporterConfig": []DocField{
+		{
+			Name: "EnableConsensusFaultReporter",
+			Type: "bool",
+
+			Comment: `EnableConsensusFaultReporter controls whether the node will monitor and
+report consensus faults. When enabled, the node will watch for malicious
+behaviors like double-mining and parent grinding, and submit reports to the
+network. This can earn reporter rewards, but is not guaranteed. Nodes should
+enable fault reporting with care, as it may increase resource usage, and may
+generate gas fees without earning rewards.`,
+		},
+		{
+			Name: "ConsensusFaultReporterDataDir",
+			Type: "string",
+
+			Comment: `ConsensusFaultReporterDataDir is the path where fault reporter state will be
+persisted. This directory should have adequate space and permissions for the
+node process.`,
+		},
+		{
+			Name: "ConsensusFaultReporterAddress",
+			Type: "string",
+
+			Comment: `ConsensusFaultReporterAddress is the wallet address used for submitting
+ReportConsensusFault messages. It will pay for gas fees, and receive any
+rewards. This address should have adequate funds to cover gas fees.`,
+		},
+	},
 	"lotus_config.FeeConfig": []DocField{
 		{
 			Name: "DefaultMaxFee",
@@ -1256,6 +1355,12 @@ Set to 0 to keep all mappings`,
 		{
 			Name: "Index",
 			Type: "IndexConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "FaultReporter",
+			Type: "FaultReporterConfig",
 
 			Comment: ``,
 		},
@@ -1567,6 +1672,12 @@ Before enabling this option, make sure your PoSt workers work correctly.`,
 'lotus-miner proving compute window-post 0'`,
 		},
 		{
+			Name: "//",
+			Type: "//",
+
+			Comment: `A single partition may contain up to 2349 32GiB sectors, or 2300 64GiB sectors.`,
+		},
+		{
 			Name: "MaxPartitionsPerPoStMessage",
 			Type: "int",
 
@@ -1848,7 +1959,7 @@ required to have expiration of at least the soonest-ending deal`,
 
 			Comment: `CommittedCapacitySectorLifetime is the duration a Committed Capacity (CC) sector will
 live before it must be extended or converted into sector containing deals before it is
-terminated. Value must be between 180-540 days inclusive`,
+terminated. Value must be between 180-1278 days (1278 in nv21, 540 before nv21).`,
 		},
 		{
 			Name: "WaitDealsDelay",
@@ -1903,12 +2014,6 @@ This is useful for forcing all deals to be assigned as snap deals to sectors mar
 			Comment: `Don't send collateral with messages even if there is no available balance in the miner actor`,
 		},
 		{
-			Name: "BatchPreCommits",
-			Type: "bool",
-
-			Comment: `enable / disable precommit batching (takes effect after nv13)`,
-		},
-		{
 			Name: "MaxPreCommitBatch",
 			Type: "int",
 
@@ -1961,7 +2066,8 @@ This is useful for forcing all deals to be assigned as snap deals to sectors mar
 			Type: "types.FIL",
 
 			Comment: `network BaseFee below which to stop doing precommit batching, instead
-sending precommit messages to the chain individually`,
+sending precommit messages to the chain individually. When the basefee is
+below this threshold, precommit messages will get sent out immediately.`,
 		},
 		{
 			Name: "AggregateAboveBaseFee",
@@ -1997,6 +2103,12 @@ Submitting a smaller number of prove commits per epoch would reduce the possibil
 			Type: "Duration",
 
 			Comment: ``,
+		},
+		{
+			Name: "UseSyntheticPoRep",
+			Type: "bool",
+
+			Comment: `UseSyntheticPoRep, when set to true, will reduce the amount of cache data held on disk after the completion of PreCommit 2 to 11GiB.`,
 		},
 	},
 	"lotus_config.Splitstore": []DocField{

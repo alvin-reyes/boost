@@ -9,9 +9,10 @@ import (
 	"path"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/ldb"
-	"github.com/filecoin-project/boostd-data/svc/types"
-	"github.com/filecoin-project/boostd-data/yugabyte"
+	"github.com/filecoin-project/boost/extern/boostd-data/ldb"
+	"github.com/filecoin-project/boost/extern/boostd-data/metrics"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
@@ -25,8 +26,8 @@ type Service struct {
 	Impl types.ServiceImpl
 }
 
-func NewYugabyte(settings yugabyte.DBSettings) *Service {
-	return &Service{Impl: yugabyte.NewStore(settings)}
+func NewYugabyte(settings yugabyte.DBSettings, migrator *yugabyte.Migrator, storeOpts ...yugabyte.StoreOpt) *Service {
+	return &Service{Impl: yugabyte.NewStore(settings, migrator, storeOpts...)}
 }
 
 func NewLevelDB(repoPath string) (*Service, error) {
@@ -64,6 +65,7 @@ func (s *Service) Start(ctx context.Context, addr string) (net.Addr, error) {
 	server.Register("boostddata", s.Impl)
 	router := mux.NewRouter()
 	router.Handle("/", server)
+	router.Handle("/metrics", metrics.Exporter("boostd_data")) // metrics
 
 	srv := &http.Server{Handler: router}
 	log.Infow("local index directory server is listening", "addr", ln.Addr())

@@ -82,6 +82,37 @@ type Deal {
   Sector: Sector!
   Message: String!
   Logs: [DealLog]!
+  SealingState: String!
+}
+
+type DirectDeal {
+  ID: ID!
+  ClientAddress: String!
+  ProviderAddress: String!
+  CreatedAt: Time!
+  PieceCid: String!
+  PieceSize: Uint64!
+  AnnounceToIPNI: Boolean!
+  KeepUnsealedCopy: Boolean!
+  StartEpoch: Uint64!
+  EndEpoch: Uint64!
+  InboundFilePath: String!
+  AllocationID: Uint64!
+  CleanupData: Boolean!
+  Checkpoint: Checkpoint!
+  CheckpointAt: Time!
+  Err: String!
+  Retry: String!
+  Transferred: Uint64!
+  Sector: Sector!
+  Message: String!
+  Logs: [DealLog]!
+}
+
+type DirectDealList {
+  totalCount: Int!
+  deals: [DirectDeal]!
+  more: Boolean!
 }
 
 type LegacyDeal {
@@ -173,6 +204,7 @@ type PieceDeal {
 }
 
 type PieceInfoDeal {
+  MinerAddress: String!
   ChainDealID: Uint64!
   Sector: Sector!
   SealStatus: SealStatus!
@@ -319,10 +351,15 @@ type SealingPipeline {
   Workers: [Worker]!
 }
 
-type DealData {
-  Indexed: Uint64!
-  FlaggedUnsealed: Uint64!
-  FlaggedSealed: Uint64!
+type SectorStatus {
+  Number: Uint64!
+  State: String!
+  DealIDs: [Uint64!]!
+}
+
+type ScanProgress {
+  Progress: Float!
+  LastScan: Time
 }
 
 type Pieces {
@@ -342,7 +379,7 @@ type SectorProvingState {
 }
 
 type LID {
-  DealData: DealData!
+  ScanProgress: ScanProgress!
   Pieces: Pieces!
   SectorUnsealedCopies: SectorUnsealedCopies!
   SectorProvingState: SectorProvingState!
@@ -485,9 +522,20 @@ input DealFilter {
   IsVerified: Boolean
 }
 
+type PiecePayload {
+  PayloadCid: String!
+  Multihash: String!
+}
+
 type RootQuery {
   """Get height of chain"""
   epoch: EpochInfo!
+
+  """Get miner address"""
+  minerAddress: String!
+
+  """Get list of miners that graphsync can retrieve data from"""
+  graphsyncRetrievalMinerAddresses: [String!]!
 
   """Get Deal by ID"""
   deal(id: ID!): Deal
@@ -495,17 +543,26 @@ type RootQuery {
   """Get Deal made with legacy markets endpoint by ID"""
   legacyDeal(id: ID!): LegacyDeal
 
+  """Get Direct Deal by ID"""
+  directDeal(id: ID!): DirectDeal
+
   """Get all Deals"""
   deals(query: String, filter: DealFilter, cursor: ID, offset: Int, limit: Int): DealList!
 
   """Get all Deals made with legacy markets endpoint"""
   legacyDeals(query: String, cursor: ID, offset: Int, limit: Int): LegacyDealList!
 
+  """Get all Direct Deals"""
+  directDeals(query: String, filter: DealFilter, cursor: ID, offset: Int, limit: Int): DirectDealList!
+
   """Get the total number of deals"""
   dealsCount: Int!
 
   """Get the total number of deals made with legacy markets endpoint"""
   legacyDealsCount: Int!
+
+  """Get the total number of direct deals"""
+  directDealsCount: Int!
 
   """Get deal proposal logs"""
   proposalLogs(accepted: Boolean, cursor: BigInt, offset: Int, limit: Int): ProposalLogsList!
@@ -534,9 +591,6 @@ type RootQuery {
   """Get the pieces that contain a particular payload CID"""
   piecesWithPayloadCid(payloadCid: String!): [String!]!
 
-  """Get the pieces that have a particular root payload CID"""
-  piecesWithRootPayloadCid(payloadCid: String!): [String!]!
-
   """Get the indexes for a particular piece CID"""
   pieceIndexes(pieceCid: String!): [String!]!
 
@@ -548,6 +602,9 @@ type RootQuery {
 
   """Get sealing pipeline state"""
   sealingpipeline: SealingPipeline!
+
+  """Get status of a particular sector"""
+  sectorStatus(sectorNumber: Uint64!): SectorStatus!
 
   """Get IPNI Provider configuration and state"""
   ipniProviderInfo: IpniProviderInfo!
@@ -590,6 +647,12 @@ type RootQuery {
 
   """Get storage ask (price of doing a storage deal)"""
   storageAsk: StorageAsk!
+
+  """Get the payload CIDs and corresponding multihashes for a particular piece CID"""
+  piecePayloadCids(pieceCid: String!): [PiecePayload]!
+
+  """Get the latest IPNI advertisemen"""
+  ipniDistanceFromLatestAd(LatestAdcid: String!, Adcid: String!): Int!
 }
 
 type RootMutation {

@@ -10,8 +10,8 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost-gfm/piecestore"
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
@@ -57,6 +57,7 @@ type resolver struct {
 	repo           lotus_repo.LockedRepo
 	h              host.Host
 	dealsDB        *db.DealsDB
+	directDealsDB  *db.DirectDealsDB
 	logsDB         *db.LogsDB
 	retDB          *rtvllog.RetrievalLogDB
 	plDB           *db.ProposalLogsDB
@@ -64,12 +65,12 @@ type resolver struct {
 	fundMgr        *fundmanager.FundManager
 	storageMgr     *storagemanager.StorageManager
 	provider       *storagemarket.Provider
+	ddProvider     *storagemarket.DirectDealsProvider
 	legacyDeals    *legacy.LegacyDealsManager
 	legacyProv     gfm_storagemarket.StorageProvider
 	legacyDT       dtypes.ProviderDataTransfer
 	ps             piecestore.PieceStore
 	ssm            *sectorstatemgr.SectorStateMgr
-	sa             retrievalmarket.SectorAccessor
 	piecedirectory *piecedirectory.PieceDirectory
 	publisher      *storageadapter.DealPublisher
 	idxProv        provider.Interface
@@ -77,15 +78,17 @@ type resolver struct {
 	spApi          sealingpipeline.API
 	fullNode       v1api.FullNode
 	mpool          *mpoolmonitor.MpoolMonitor
+	mma            *lib.MultiMinerAccessor
 }
 
-func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor) *resolver {
+func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, ddProvider *storagemarket.DirectDealsProvider, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *resolver {
 	return &resolver{
 		ctx:            ctx,
 		cfg:            cfg,
 		repo:           r,
 		h:              h,
 		dealsDB:        dealsDB,
+		directDealsDB:  directDealsDB,
 		logsDB:         logsDB,
 		retDB:          retDB,
 		plDB:           plDB,
@@ -93,11 +96,11 @@ func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo
 		fundMgr:        fundMgr,
 		storageMgr:     storageMgr,
 		provider:       provider,
+		ddProvider:     ddProvider,
 		legacyDeals:    legacyDeals,
 		legacyProv:     legacyProv,
 		legacyDT:       legacyDT,
 		ps:             ps,
-		sa:             sa,
 		piecedirectory: piecedirectory,
 		publisher:      publisher,
 		spApi:          spApi,
@@ -106,6 +109,7 @@ func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo
 		fullNode:       fullNode,
 		ssm:            ssm,
 		mpool:          mpool,
+		mma:            mma,
 	}
 }
 
@@ -121,7 +125,7 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 		return nil, err
 	}
 
-	return newDealResolver(deal, r.provider, r.dealsDB, r.logsDB, r.spApi), nil
+	return newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi), nil
 }
 
 type filterArgs struct {
@@ -174,7 +178,7 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 	resolvers := make([]*dealResolver, 0, len(deals))
 	for _, deal := range deals {
 		deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
-		resolvers = append(resolvers, newDealResolver(&deal, r.provider, r.dealsDB, r.logsDB, r.spApi))
+		resolvers = append(resolvers, newDealResolver(r.mpool, &deal, r.provider, r.dealsDB, r.logsDB, r.spApi))
 	}
 
 	return &dealListResolver{
@@ -207,7 +211,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 	}
 
 	net := make(chan *dealResolver, 1)
-	net <- newDealResolver(deal, r.provider, r.dealsDB, r.logsDB, r.spApi)
+	net <- newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi)
 
 	// Updates to deal state are broadcast on pubsub. Pipe these updates to the
 	// client
@@ -219,7 +223,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 		}
 		return nil, fmt.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
 	}
-	sub := &subLastUpdate{sub: dealUpdatesSub, provider: r.provider, dealsDB: r.dealsDB, logsDB: r.logsDB, spApi: r.spApi}
+	sub := &subLastUpdate{sub: dealUpdatesSub, provider: r.provider, dealsDB: r.dealsDB, logsDB: r.logsDB, spApi: r.spApi, mpool: r.mpool}
 	go func() {
 		sub.Pipe(ctx, net) // blocks until connection is closed
 		close(net)
@@ -258,7 +262,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 			case evti := <-sub.Out():
 				// Pipe the deal to the new deal channel
 				di := evti.(types.ProviderDealState)
-				rsv := newDealResolver(&di, r.provider, r.dealsDB, r.logsDB, r.spApi)
+				rsv := newDealResolver(r.mpool, &di, r.provider, r.dealsDB, r.logsDB, r.spApi)
 				totalCount, err := r.dealsDB.Count(ctx, "", nil)
 				if err != nil {
 					log.Errorf("getting total deal count: %w", err)
@@ -279,6 +283,11 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 	}()
 
 	return c, nil
+}
+
+func (r *resolver) isDirectDeal(ctx context.Context, dealUuid uuid.UUID) bool {
+	_, err := r.directDealsDB.ByID(ctx, dealUuid)
+	return err == nil
 }
 
 // mutation: dealCancel(id): ID
@@ -303,9 +312,15 @@ func (r *resolver) DealCancel(ctx context.Context, args struct{ ID graphql.ID })
 }
 
 // mutation: dealRetryPaused(id): ID
-func (r *resolver) DealRetryPaused(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
+func (r *resolver) DealRetryPaused(ctx context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
 	dealUuid, err := toUuid(args.ID)
 	if err != nil {
+		return args.ID, err
+	}
+
+	// Check whether this is a direct deal
+	if r.isDirectDeal(ctx, dealUuid) {
+		err = r.ddProvider.RetryPausedDeal(ctx, dealUuid)
 		return args.ID, err
 	}
 
@@ -314,9 +329,15 @@ func (r *resolver) DealRetryPaused(_ context.Context, args struct{ ID graphql.ID
 }
 
 // mutation: dealFailPaused(id): ID
-func (r *resolver) DealFailPaused(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
+func (r *resolver) DealFailPaused(ctx context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
 	dealUuid, err := toUuid(args.ID)
 	if err != nil {
+		return args.ID, err
+	}
+
+	// Check whether this is a direct deal
+	if r.isDirectDeal(ctx, dealUuid) {
+		err = r.ddProvider.FailPausedDeal(ctx, dealUuid)
 		return args.ID, err
 	}
 
@@ -378,6 +399,7 @@ func (r *resolver) dealList(ctx context.Context, query string, filter *db.Filter
 }
 
 type dealResolver struct {
+	mpool *mpoolmonitor.MpoolMonitor
 	types.ProviderDealState
 	provider    *storagemarket.Provider
 	transferred uint64
@@ -386,8 +408,9 @@ type dealResolver struct {
 	spApi       sealingpipeline.API
 }
 
-func newDealResolver(deal *types.ProviderDealState, provider *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, spApi sealingpipeline.API) *dealResolver {
+func newDealResolver(mpool *mpoolmonitor.MpoolMonitor, deal *types.ProviderDealState, provider *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, spApi sealingpipeline.API) *dealResolver {
 	return &dealResolver{
+		mpool:             mpool,
 		ProviderDealState: *deal,
 		provider:          provider,
 		transferred:       uint64(deal.NBytesReceived),
@@ -591,15 +614,24 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	case dealcheckpoints.Transferred:
 		return "Ready to Publish"
 	case dealcheckpoints.Published:
-		elapsedEpochs := uint64(time.Since(checkpointAt).Seconds()) / build.BlockDelaySecs
+		if *dr.PublishCID == cid.Undef {
+			return "Awaiting Message CID"
+		}
+		found, elapsedEpochs, err := dr.mpool.MsgExecElapsedEpochs(ctx, *dr.PublishCID)
+		if found {
+			return "Awaiting Message Execution"
+		}
+		if err != nil {
+			return fmt.Sprint(err)
+		}
 		confidenceEpochs := build.MessageConfidence * 2
 		return fmt.Sprintf("Awaiting Publish Confirmation (%d/%d epochs)", elapsedEpochs, confidenceEpochs)
 	case dealcheckpoints.PublishConfirmed:
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece:
-		return "Announcing"
+		return "Indexing"
 	case dealcheckpoints.IndexedAndAnnounced:
-		return dr.sealingState(ctx)
+		return "Indexed and Announced"
 	case dealcheckpoints.Complete:
 		switch dr.Err {
 		case "":
@@ -610,6 +642,16 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 		return "Error: " + dr.Err
 	}
 	return checkpoint.String()
+}
+
+func (dr *dealResolver) SealingState(ctx context.Context) string {
+	if dr.ProviderDealState.Checkpoint < dealcheckpoints.AddedPiece {
+		return "To be sealed"
+	}
+	if dr.ProviderDealState.Checkpoint == dealcheckpoints.Complete {
+		return "Complete"
+	}
+	return dr.sealingState(ctx)
 }
 
 func (dr *dealResolver) TransferSamples() []*transferPoint {
@@ -698,6 +740,7 @@ type subLastUpdate struct {
 	dealsDB  *db.DealsDB
 	logsDB   *db.LogsDB
 	spApi    sealingpipeline.API
+	mpool    *mpoolmonitor.MpoolMonitor
 }
 
 func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
@@ -736,7 +779,7 @@ func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
 	loop:
 		for {
 			di := lastUpdate.(types.ProviderDealState)
-			rsv := newDealResolver(&di, s.provider, s.dealsDB, s.logsDB, s.spApi)
+			rsv := newDealResolver(s.mpool, &di, s.provider, s.dealsDB, s.logsDB, s.spApi)
 
 			select {
 			case <-ctx.Done():

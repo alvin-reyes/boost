@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	abi "github.com/filecoin-project/go-state-types/abi"
+	verifreg "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	xerrors "golang.org/x/xerrors"
@@ -39,7 +40,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Miner"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Miner")); err != nil {
+	if _, err := cw.WriteString(string("Miner")); err != nil {
 		return err
 	}
 
@@ -55,7 +56,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Price"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Price")); err != nil {
+	if _, err := cw.WriteString(string("Price")); err != nil {
 		return err
 	}
 
@@ -71,7 +72,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("MaxPieceSize"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("MaxPieceSize")); err != nil {
+	if _, err := cw.WriteString(string("MaxPieceSize")); err != nil {
 		return err
 	}
 
@@ -87,7 +88,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("MinPieceSize"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("MinPieceSize")); err != nil {
+	if _, err := cw.WriteString(string("MinPieceSize")); err != nil {
 		return err
 	}
 
@@ -103,7 +104,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("VerifiedPrice"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("VerifiedPrice")); err != nil {
+	if _, err := cw.WriteString(string("VerifiedPrice")); err != nil {
 		return err
 	}
 
@@ -240,7 +241,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+	if _, err := cw.WriteString(string("DealUUID")); err != nil {
 		return err
 	}
 
@@ -264,7 +265,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Transfer"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Transfer")); err != nil {
+	if _, err := cw.WriteString(string("Transfer")); err != nil {
 		return err
 	}
 
@@ -280,7 +281,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("IsOffline"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("IsOffline")); err != nil {
+	if _, err := cw.WriteString(string("IsOffline")); err != nil {
 		return err
 	}
 
@@ -296,7 +297,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealDataRoot"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealDataRoot")); err != nil {
+	if _, err := cw.WriteString(string("DealDataRoot")); err != nil {
 		return err
 	}
 
@@ -312,7 +313,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ClientDealProposal"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("ClientDealProposal")); err != nil {
+	if _, err := cw.WriteString(string("ClientDealProposal")); err != nil {
 		return err
 	}
 
@@ -464,7 +465,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+	if _, err := cw.WriteString(string("DealUUID")); err != nil {
 		return err
 	}
 
@@ -488,7 +489,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Transfer"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Transfer")); err != nil {
+	if _, err := cw.WriteString(string("Transfer")); err != nil {
 		return err
 	}
 
@@ -504,7 +505,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("IsOffline"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("IsOffline")); err != nil {
+	if _, err := cw.WriteString(string("IsOffline")); err != nil {
 		return err
 	}
 
@@ -520,7 +521,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealDataRoot"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealDataRoot")); err != nil {
+	if _, err := cw.WriteString(string("DealDataRoot")); err != nil {
 		return err
 	}
 
@@ -536,7 +537,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SkipIPNIAnnounce"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("SkipIPNIAnnounce")); err != nil {
+	if _, err := cw.WriteString(string("SkipIPNIAnnounce")); err != nil {
 		return err
 	}
 
@@ -552,7 +553,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ClientDealProposal"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("ClientDealProposal")); err != nil {
+	if _, err := cw.WriteString(string("ClientDealProposal")); err != nil {
 		return err
 	}
 
@@ -568,7 +569,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("RemoveUnsealedCopy"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("RemoveUnsealedCopy")); err != nil {
+	if _, err := cw.WriteString(string("RemoveUnsealedCopy")); err != nil {
 		return err
 	}
 
@@ -736,6 +737,433 @@ func (t *DealParams) UnmarshalCBOR(r io.Reader) (err error) {
 
 	return nil
 }
+func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+
+	cw := cbg.NewCborWriter(w)
+
+	if _, err := cw.Write([]byte{170}); err != nil {
+		return err
+	}
+
+	// t.DealUUID (uuid.UUID) (array)
+	if len("DealUUID") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"DealUUID\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("DealUUID")); err != nil {
+		return err
+	}
+
+	if len(t.DealUUID) > cbg.ByteArrayMaxLen {
+		return xerrors.Errorf("Byte array in field t.DealUUID was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajByteString, uint64(len(t.DealUUID))); err != nil {
+		return err
+	}
+
+	if _, err := cw.Write(t.DealUUID[:]); err != nil {
+		return err
+	}
+
+	// t.EndEpoch (abi.ChainEpoch) (int64)
+	if len("EndEpoch") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"EndEpoch\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("EndEpoch"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("EndEpoch")); err != nil {
+		return err
+	}
+
+	if t.EndEpoch >= 0 {
+		if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.EndEpoch)); err != nil {
+			return err
+		}
+	} else {
+		if err := cw.WriteMajorTypeHeader(cbg.MajNegativeInt, uint64(-t.EndEpoch-1)); err != nil {
+			return err
+		}
+	}
+
+	// t.FilePath (string) (string)
+	if len("FilePath") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"FilePath\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("FilePath"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("FilePath")); err != nil {
+		return err
+	}
+
+	if len(t.FilePath) > cbg.MaxLength {
+		return xerrors.Errorf("Value in field t.FilePath was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.FilePath))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string(t.FilePath)); err != nil {
+		return err
+	}
+
+	// t.PieceCid (cid.Cid) (struct)
+	if len("PieceCid") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"PieceCid\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("PieceCid"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("PieceCid")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteCid(cw, t.PieceCid); err != nil {
+		return xerrors.Errorf("failed to write cid field t.PieceCid: %w", err)
+	}
+
+	// t.ClientAddr (address.Address) (struct)
+	if len("ClientAddr") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"ClientAddr\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ClientAddr"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("ClientAddr")); err != nil {
+		return err
+	}
+
+	if err := t.ClientAddr.MarshalCBOR(cw); err != nil {
+		return err
+	}
+
+	// t.StartEpoch (abi.ChainEpoch) (int64)
+	if len("StartEpoch") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"StartEpoch\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("StartEpoch"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("StartEpoch")); err != nil {
+		return err
+	}
+
+	if t.StartEpoch >= 0 {
+		if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.StartEpoch)); err != nil {
+			return err
+		}
+	} else {
+		if err := cw.WriteMajorTypeHeader(cbg.MajNegativeInt, uint64(-t.StartEpoch-1)); err != nil {
+			return err
+		}
+	}
+
+	// t.AllocationID (verifreg.AllocationId) (uint64)
+	if len("AllocationID") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"AllocationID\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("AllocationID"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("AllocationID")); err != nil {
+		return err
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.AllocationID)); err != nil {
+		return err
+	}
+
+	// t.SkipIPNIAnnounce (bool) (bool)
+	if len("SkipIPNIAnnounce") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"SkipIPNIAnnounce\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SkipIPNIAnnounce"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("SkipIPNIAnnounce")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteBool(w, t.SkipIPNIAnnounce); err != nil {
+		return err
+	}
+
+	// t.DeleteAfterImport (bool) (bool)
+	if len("DeleteAfterImport") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"DeleteAfterImport\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DeleteAfterImport"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("DeleteAfterImport")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteBool(w, t.DeleteAfterImport); err != nil {
+		return err
+	}
+
+	// t.RemoveUnsealedCopy (bool) (bool)
+	if len("RemoveUnsealedCopy") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"RemoveUnsealedCopy\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("RemoveUnsealedCopy"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("RemoveUnsealedCopy")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteBool(w, t.RemoveUnsealedCopy); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *DirectDealParams) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = DirectDealParams{}
+
+	cr := cbg.NewCborReader(r)
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajMap {
+		return fmt.Errorf("cbor input should be of type map")
+	}
+
+	if extra > cbg.MaxLength {
+		return fmt.Errorf("DirectDealParams: map struct too large (%d)", extra)
+	}
+
+	var name string
+	n := extra
+
+	for i := uint64(0); i < n; i++ {
+
+		{
+			sval, err := cbg.ReadString(cr)
+			if err != nil {
+				return err
+			}
+
+			name = string(sval)
+		}
+
+		switch name {
+		// t.DealUUID (uuid.UUID) (array)
+		case "DealUUID":
+
+			maj, extra, err = cr.ReadHeader()
+			if err != nil {
+				return err
+			}
+
+			if extra > cbg.ByteArrayMaxLen {
+				return fmt.Errorf("t.DealUUID: byte array too large (%d)", extra)
+			}
+			if maj != cbg.MajByteString {
+				return fmt.Errorf("expected byte array")
+			}
+
+			if extra != 16 {
+				return fmt.Errorf("expected array to have 16 elements")
+			}
+
+			t.DealUUID = [16]uint8{}
+
+			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
+				return err
+			}
+			// t.EndEpoch (abi.ChainEpoch) (int64)
+		case "EndEpoch":
+			{
+				maj, extra, err := cr.ReadHeader()
+				var extraI int64
+				if err != nil {
+					return err
+				}
+				switch maj {
+				case cbg.MajUnsignedInt:
+					extraI = int64(extra)
+					if extraI < 0 {
+						return fmt.Errorf("int64 positive overflow")
+					}
+				case cbg.MajNegativeInt:
+					extraI = int64(extra)
+					if extraI < 0 {
+						return fmt.Errorf("int64 negative overflow")
+					}
+					extraI = -1 - extraI
+				default:
+					return fmt.Errorf("wrong type for int64 field: %d", maj)
+				}
+
+				t.EndEpoch = abi.ChainEpoch(extraI)
+			}
+			// t.FilePath (string) (string)
+		case "FilePath":
+
+			{
+				sval, err := cbg.ReadString(cr)
+				if err != nil {
+					return err
+				}
+
+				t.FilePath = string(sval)
+			}
+			// t.PieceCid (cid.Cid) (struct)
+		case "PieceCid":
+
+			{
+
+				c, err := cbg.ReadCid(cr)
+				if err != nil {
+					return xerrors.Errorf("failed to read cid field t.PieceCid: %w", err)
+				}
+
+				t.PieceCid = c
+
+			}
+			// t.ClientAddr (address.Address) (struct)
+		case "ClientAddr":
+
+			{
+
+				if err := t.ClientAddr.UnmarshalCBOR(cr); err != nil {
+					return xerrors.Errorf("unmarshaling t.ClientAddr: %w", err)
+				}
+
+			}
+			// t.StartEpoch (abi.ChainEpoch) (int64)
+		case "StartEpoch":
+			{
+				maj, extra, err := cr.ReadHeader()
+				var extraI int64
+				if err != nil {
+					return err
+				}
+				switch maj {
+				case cbg.MajUnsignedInt:
+					extraI = int64(extra)
+					if extraI < 0 {
+						return fmt.Errorf("int64 positive overflow")
+					}
+				case cbg.MajNegativeInt:
+					extraI = int64(extra)
+					if extraI < 0 {
+						return fmt.Errorf("int64 negative overflow")
+					}
+					extraI = -1 - extraI
+				default:
+					return fmt.Errorf("wrong type for int64 field: %d", maj)
+				}
+
+				t.StartEpoch = abi.ChainEpoch(extraI)
+			}
+			// t.AllocationID (verifreg.AllocationId) (uint64)
+		case "AllocationID":
+
+			{
+
+				maj, extra, err = cr.ReadHeader()
+				if err != nil {
+					return err
+				}
+				if maj != cbg.MajUnsignedInt {
+					return fmt.Errorf("wrong type for uint64 field")
+				}
+				t.AllocationID = verifreg.AllocationId(extra)
+
+			}
+			// t.SkipIPNIAnnounce (bool) (bool)
+		case "SkipIPNIAnnounce":
+
+			maj, extra, err = cr.ReadHeader()
+			if err != nil {
+				return err
+			}
+			if maj != cbg.MajOther {
+				return fmt.Errorf("booleans must be major type 7")
+			}
+			switch extra {
+			case 20:
+				t.SkipIPNIAnnounce = false
+			case 21:
+				t.SkipIPNIAnnounce = true
+			default:
+				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
+			}
+			// t.DeleteAfterImport (bool) (bool)
+		case "DeleteAfterImport":
+
+			maj, extra, err = cr.ReadHeader()
+			if err != nil {
+				return err
+			}
+			if maj != cbg.MajOther {
+				return fmt.Errorf("booleans must be major type 7")
+			}
+			switch extra {
+			case 20:
+				t.DeleteAfterImport = false
+			case 21:
+				t.DeleteAfterImport = true
+			default:
+				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
+			}
+			// t.RemoveUnsealedCopy (bool) (bool)
+		case "RemoveUnsealedCopy":
+
+			maj, extra, err = cr.ReadHeader()
+			if err != nil {
+				return err
+			}
+			if maj != cbg.MajOther {
+				return fmt.Errorf("booleans must be major type 7")
+			}
+			switch extra {
+			case 20:
+				t.RemoveUnsealedCopy = false
+			case 21:
+				t.RemoveUnsealedCopy = true
+			default:
+				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
+			}
+
+		default:
+			// Field doesn't exist on this type, so ignore it
+			cbg.ScanForLinks(r, func(cid.Cid) {})
+		}
+	}
+
+	return nil
+}
 func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if t == nil {
 		_, err := w.Write(cbg.CborNull)
@@ -756,7 +1184,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Size"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Size")); err != nil {
+	if _, err := cw.WriteString(string("Size")); err != nil {
 		return err
 	}
 
@@ -772,7 +1200,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Type"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Type")); err != nil {
+	if _, err := cw.WriteString(string("Type")); err != nil {
 		return err
 	}
 
@@ -783,7 +1211,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Type))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Type)); err != nil {
+	if _, err := cw.WriteString(string(t.Type)); err != nil {
 		return err
 	}
 
@@ -795,7 +1223,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Params"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Params")); err != nil {
+	if _, err := cw.WriteString(string("Params")); err != nil {
 		return err
 	}
 
@@ -819,7 +1247,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ClientID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("ClientID")); err != nil {
+	if _, err := cw.WriteString(string("ClientID")); err != nil {
 		return err
 	}
 
@@ -830,7 +1258,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.ClientID))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.ClientID)); err != nil {
+	if _, err := cw.WriteString(string(t.ClientID)); err != nil {
 		return err
 	}
 	return nil
@@ -962,7 +1390,7 @@ func (t *DealResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Message"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Message")); err != nil {
+	if _, err := cw.WriteString(string("Message")); err != nil {
 		return err
 	}
 
@@ -973,7 +1401,7 @@ func (t *DealResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Message))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Message)); err != nil {
+	if _, err := cw.WriteString(string(t.Message)); err != nil {
 		return err
 	}
 
@@ -985,7 +1413,7 @@ func (t *DealResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Accepted"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Accepted")); err != nil {
+	if _, err := cw.WriteString(string("Accepted")); err != nil {
 		return err
 	}
 
@@ -1091,7 +1519,7 @@ func (t *DealStatusRequest) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+	if _, err := cw.WriteString(string("DealUUID")); err != nil {
 		return err
 	}
 
@@ -1115,7 +1543,7 @@ func (t *DealStatusRequest) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Signature"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Signature")); err != nil {
+	if _, err := cw.WriteString(string("Signature")); err != nil {
 		return err
 	}
 
@@ -1226,7 +1654,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Error"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Error")); err != nil {
+	if _, err := cw.WriteString(string("Error")); err != nil {
 		return err
 	}
 
@@ -1237,7 +1665,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Error))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Error)); err != nil {
+	if _, err := cw.WriteString(string(t.Error)); err != nil {
 		return err
 	}
 
@@ -1249,7 +1677,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+	if _, err := cw.WriteString(string("DealUUID")); err != nil {
 		return err
 	}
 
@@ -1273,7 +1701,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("IsOffline"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("IsOffline")); err != nil {
+	if _, err := cw.WriteString(string("IsOffline")); err != nil {
 		return err
 	}
 
@@ -1289,7 +1717,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealStatus"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealStatus")); err != nil {
+	if _, err := cw.WriteString(string("DealStatus")); err != nil {
 		return err
 	}
 
@@ -1305,7 +1733,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("TransferSize"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("TransferSize")); err != nil {
+	if _, err := cw.WriteString(string("TransferSize")); err != nil {
 		return err
 	}
 
@@ -1321,7 +1749,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("NBytesReceived"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("NBytesReceived")); err != nil {
+	if _, err := cw.WriteString(string("NBytesReceived")); err != nil {
 		return err
 	}
 
@@ -1502,7 +1930,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Error"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Error")); err != nil {
+	if _, err := cw.WriteString(string("Error")); err != nil {
 		return err
 	}
 
@@ -1513,7 +1941,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Error))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Error)); err != nil {
+	if _, err := cw.WriteString(string(t.Error)); err != nil {
 		return err
 	}
 
@@ -1525,7 +1953,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Status"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Status")); err != nil {
+	if _, err := cw.WriteString(string("Status")); err != nil {
 		return err
 	}
 
@@ -1536,7 +1964,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Status))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Status)); err != nil {
+	if _, err := cw.WriteString(string(t.Status)); err != nil {
 		return err
 	}
 
@@ -1548,7 +1976,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Proposal"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Proposal")); err != nil {
+	if _, err := cw.WriteString(string("Proposal")); err != nil {
 		return err
 	}
 
@@ -1564,7 +1992,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("PublishCid"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("PublishCid")); err != nil {
+	if _, err := cw.WriteString(string("PublishCid")); err != nil {
 		return err
 	}
 
@@ -1586,7 +2014,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ChainDealID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("ChainDealID")); err != nil {
+	if _, err := cw.WriteString(string("ChainDealID")); err != nil {
 		return err
 	}
 
@@ -1602,7 +2030,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SealingStatus"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("SealingStatus")); err != nil {
+	if _, err := cw.WriteString(string("SealingStatus")); err != nil {
 		return err
 	}
 
@@ -1613,7 +2041,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.SealingStatus))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.SealingStatus)); err != nil {
+	if _, err := cw.WriteString(string(t.SealingStatus)); err != nil {
 		return err
 	}
 
@@ -1625,7 +2053,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SignedProposalCid"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("SignedProposalCid")); err != nil {
+	if _, err := cw.WriteString(string("SignedProposalCid")); err != nil {
 		return err
 	}
 

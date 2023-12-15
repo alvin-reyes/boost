@@ -38,7 +38,8 @@ type Boost struct {
 	// The connect string for the sealing RPC API (lotus miner)
 	SealerApiInfo string
 	// The connect string for the sector index RPC API (lotus miner)
-	SectorIndexApiInfo  string
+	SectorIndexApiInfo string
+
 	Dealmaking          DealmakingConfig
 	Wallets             WalletsConfig
 	Graphql             GraphqlConfig
@@ -46,6 +47,7 @@ type Boost struct {
 	Tracing             TracingConfig
 	LocalIndexDirectory LocalIndexDirectoryConfig
 	ContractDeals       ContractDealsConfig
+	HttpDownload        HttpDownloadConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -279,6 +281,12 @@ type DealmakingConfig struct {
 	// The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
 	// ignored, and deals will remain in the pending state until manually published.
 	ManualDealPublish bool
+
+	// The connect strings for the RPC APIs of each miner that boost can read
+	// sector data from when serving graphsync retrievals.
+	// If this parameter is not set, boost will serve data from the endpoint
+	// configured in SectorIndexApiInfo.
+	GraphsyncStorageAccessApiInfo []string
 }
 
 type ContractDealsConfig struct {
@@ -327,6 +335,12 @@ type IndexProviderConfig struct {
 	Announce IndexProviderAnnounceConfig
 
 	HttpPublisher IndexProviderHttpPublisherConfig
+
+	// Set this to true to use the legacy data-transfer/graphsync publisher.
+	// This should only be used as a temporary fall-back if publishing ipnisync
+	// over libp2p or HTTP is not working, and publishing over
+	// data-transfer/graphsync was previously working.
+	DataTransferPublisher bool
 }
 
 type IndexProviderAnnounceConfig struct {
@@ -340,7 +354,7 @@ type IndexProviderAnnounceConfig struct {
 }
 
 type IndexProviderHttpPublisherConfig struct {
-	// If not enabled, requests are served over graphsync instead.
+	// If enabled, requests are served over HTTP instead of libp2p.
 	Enabled bool
 	// Set the public hostname / IP for the index provider listener.
 	// eg "82.129.73.111"
@@ -349,6 +363,10 @@ type IndexProviderHttpPublisherConfig struct {
 	// Set the port on which to listen for index provider requests over HTTP.
 	// Note that this port must be open on the firewall.
 	Port int
+	// Set this to true to publish HTTP over libp2p in addition to plain HTTP,
+	// Otherwise, the publisher will publish content advertisements using only
+	// plain HTTP if Enabled is true.
+	WithLibp2p bool
 }
 
 type FeeConfig struct {
@@ -394,11 +412,15 @@ type LocalIndexDirectoryYugabyteConfig struct {
 
 type LocalIndexDirectoryConfig struct {
 	Yugabyte LocalIndexDirectoryYugabyteConfig
+	Leveldb  LocalIndexDirectoryLeveldbConfig
 	// The maximum number of add index operations allowed to execute in parallel.
 	// The add index operation is executed when a new deal is created - it fetches
 	// the piece from the sealing subsystem, creates an index of where each block
 	// is in the piece, and adds the index to the local index directory.
 	ParallelAddIndexLimit int
+	// AddIndexConcurrency sets the number of concurrent tasks that each add index operation is split into.
+	// This setting is usefull to better utilise bandwidth between boostd and boost-data. The default value is 8.
+	AddIndexConcurrency int
 	// The port that the embedded local index directory data service runs on.
 	// Set this value to zero to disable the embedded local index directory data service
 	// (in that case the local index directory data service must be running externally)
@@ -408,4 +430,18 @@ type LocalIndexDirectoryConfig struct {
 	ServiceApiInfo string
 	// The RPC timeout when making requests to the boostd-data service
 	ServiceRPCTimeout Duration
+}
+
+type LocalIndexDirectoryLeveldbConfig struct {
+	Enabled bool
+}
+
+type HttpDownloadConfig struct {
+	// NChunks is a number of chunks to split HTTP downloads into. Each chunk is downloaded in the goroutine of its own
+	// which improves the overall download speed. NChunks is always equal to 1 for libp2p transport because libp2p server
+	// doesn't support range requests yet. NChunks must be greater than 0 and less than 16, with the default of 5.
+	NChunks int
+	// AllowPrivateIPs defines whether boost should allow HTTP downloads from private IPs as per https://en.wikipedia.org/wiki/Private_network.
+	// The default is false.
+	AllowPrivateIPs bool
 }

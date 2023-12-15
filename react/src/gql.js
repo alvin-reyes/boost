@@ -69,6 +69,18 @@ const EpochQuery = gql`
     }
 `;
 
+const MinerAddressQuery = gql`
+    query AppMinerAddressQuery {
+        minerAddress
+    }
+`;
+
+const GraphsyncRetrievalMinerAddressesQuery = gql`
+    query AppGraphsyncRetrievalMinerAddressesQuery {
+        graphsyncRetrievalMinerAddresses
+    }
+`;
+
 const DealsListQuery = gql`
     query AppDealsListQuery($query: String, $filter: DealFilter, $cursor: ID, $offset: Int, $limit: Int) {
         deals(query: $query, filter: $filter, cursor: $cursor, offset: $offset, limit: $limit) {
@@ -85,6 +97,9 @@ const DealsListQuery = gql`
                 Err
                 Retry
                 Message
+                SealingState
+                ChainDealID
+                PieceSize
                 Transfer {
                     Type
                     Size
@@ -126,6 +141,35 @@ const LegacyDealsListQuery = gql`
                 Status
                 Message
                 SectorNumber
+                ChainDealID
+            }
+            totalCount
+            more
+        }
+    }
+`;
+
+const DirectDealsListQuery = gql`
+    query AppDirectDealsListQuery($query: String, $filter: DealFilter, $cursor: ID, $offset: Int, $limit: Int) {
+        directDeals(query: $query, filter: $filter, cursor: $cursor, offset: $offset, limit: $limit) {
+            deals {
+                ID
+                CreatedAt
+                AllocationID
+                ClientAddress
+                Checkpoint
+                CheckpointAt
+                AnnounceToIPNI
+                KeepUnsealedCopy
+                CleanupData
+                Err
+                Retry
+                Message
+                Sector {
+                    ID
+                    Offset
+                    Length
+                }
             }
             totalCount
             more
@@ -142,6 +186,12 @@ const DealsCountQuery = gql`
 const LegacyDealsCountQuery = gql`
     query AppLegacyDealCountQuery {
         legacyDealsCount
+    }
+`;
+
+const DirectDealsCountQuery = gql`
+    query AppDirectDealCountQuery {
+        directDealsCount
     }
 `;
 
@@ -439,6 +489,42 @@ const LegacyDealQuery = gql`
     }
 `;
 
+const DirectDealQuery = gql`
+    query AppDirectDealQuery($id: ID!) {
+        directDeal(id: $id) {
+            ID
+            CreatedAt
+            AllocationID
+            ClientAddress
+            ProviderAddress
+            PieceCid
+            PieceSize
+            StartEpoch
+            EndEpoch
+            InboundFilePath
+            Checkpoint
+            CheckpointAt
+            AnnounceToIPNI
+            KeepUnsealedCopy
+            CleanupData
+            Err
+            Retry
+            Message
+            Sector {
+                ID
+                Offset
+                Length
+            }
+            Logs {
+                CreatedAt
+                LogMsg
+                LogParams
+                Subsystem
+            }
+        }
+    }
+`;
+
 const PiecesWithRootPayloadCidQuery = gql`
     query AppPiecesWithRootPayloadCidQuery($payloadCid: String!) {
         piecesWithRootPayloadCid(payloadCid: $payloadCid)
@@ -507,6 +593,7 @@ const PieceStatusQuery = gql`
                 }
             }
             PieceInfoDeals {
+                MinerAddress
                 ChainDealID
                 Sector {
                     ID
@@ -525,10 +612,9 @@ const PieceStatusQuery = gql`
 const LIDQuery = gql`
     query AppLIDQuery {
         lid {
-            DealData {
-                Indexed
-                FlaggedUnsealed
-                FlaggedSealed
+            ScanProgress {
+                Progress
+                LastScan
             }
             Pieces {
                 Indexed
@@ -621,6 +707,16 @@ const SealingPipelineQuery = gql`
                 Stage
                 Sector
             }
+        }
+    }
+`;
+
+const SectorStatusQuery = gql`
+    query AppSectorStatusQuery($sectorNumber: Uint64!) {
+        sectorStatus(sectorNumber: $sectorNumber) {
+            Number
+            State
+            DealIDs
         }
     }
 `;
@@ -777,14 +873,34 @@ const PublishPendingDealsMutation = gql`
     }
 `;
 
+const PiecePayloadCidsQuery = gql`
+    query AppPiecePayloadCidsQuery($pieceCid: String!) {
+        piecePayloadCids(pieceCid: $pieceCid) {
+            PayloadCid
+            Multihash
+        }
+    }
+`;
+
+const IpniDistanceFromLatestAdQuery = gql`
+    query AppIpniDistanceFromLatestAdQuery($latestAdcid: String!, $adcid: String!) {
+        ipniDistanceFromLatestAd(LatestAdcid: $latestAdcid, Adcid: $adcid)
+    }
+`;
+
 export {
     gqlClient,
     EpochQuery,
+    MinerAddressQuery,
+    GraphsyncRetrievalMinerAddressesQuery,
     DealsListQuery,
     LegacyDealsListQuery,
+    DirectDealsListQuery,
     DealsCountQuery,
     LegacyDealsCountQuery,
+    DirectDealsCountQuery,
     LegacyDealQuery,
+    DirectDealQuery,
     DealSubscription,
     DealCancelMutation,
     DealRetryPausedMutation,
@@ -800,7 +916,7 @@ export {
     IpniAdEntriesQuery,
     IpniAdEntriesCountQuery,
     IpniLatestAdQuery,
-    PiecesWithRootPayloadCidQuery,
+    IpniDistanceFromLatestAdQuery,
     PiecesWithPayloadCidQuery,
     PieceBuildIndexMutation,
     PieceStatusQuery,
@@ -819,7 +935,9 @@ export {
     TransferStatsQuery,
     MpoolQuery,
     SealingPipelineQuery,
+    SectorStatusQuery,
     Libp2pAddrInfoQuery,
     StorageAskQuery,
     PublishPendingDealsMutation,
+    PiecePayloadCidsQuery,
 }

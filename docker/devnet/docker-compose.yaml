@@ -69,6 +69,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     volumes:
+      - ./data/boostd-data:/var/lib/boostd-data:rw
       - ./data/boost:/var/lib/boost:rw
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro
@@ -82,7 +83,7 @@ services:
       - "7777:7777"
     environment:
       - BOOST_PATH=/var/lib/boost
-      - LID_API_INFO=http://boost:8042
+      - LID_API_INFO=http://boost:8044
       - LOTUS_PATH=/var/lib/lotus
       - LOTUS_MINER_PATH=/var/lib/lotus-miner
     restart: unless-stopped
@@ -91,9 +92,6 @@ services:
       - ./data/boost:/var/lib/boost:ro
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro
-    labels:
-      - "com.docker-tc.enabled=1"
-      - "com.docker-tc.delay=10ms"
 
   booster-bitswap:
     container_name: booster-bitswap
@@ -104,7 +102,7 @@ services:
     environment:
       - BOOSTER_BITSWAP_REPO=/var/lib/booster-bitswap
       - BOOST_PATH=/var/lib/boost
-      - LID_API_INFO=http://boost:8042
+      - LID_API_INFO=http://boost:8044
       - LOTUS_PATH=/var/lib/lotus
       - LOTUS_MINER_PATH=/var/lib/lotus-miner
     restart: unless-stopped
@@ -114,9 +112,6 @@ services:
       - ./data/boost:/var/lib/boost:ro
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro
-    labels:
-      - "com.docker-tc.enabled=1"
-      - "com.docker-tc.delay=10ms"
 
   demo-http-server:
     container_name: demo-http-server
@@ -126,25 +121,17 @@ services:
     logging: *default-logging
     volumes:
       - ./data/sample:/usr/share/nginx/html:ro
-    labels:
-      - "com.docker-tc.enabled=1"
-      - "com.docker-tc.limit=1mbps"
-      - "com.docker-tc.delay=100ms"
 
-  tc:
-    image: "${DOCKER_IMAGE_TERMINAL:-lukaszlach/docker-tc}"
+  yugabytedb:
+    container_name: yugabytedb
+    image: filecoin/yugabytedb:dev
     init: true
-    container_name: docker-tc
-    cap_add:
-      - NET_ADMIN
+    ports:
+      - "5433:5433"
+      - "9000:9000"
+      - "9042:9042"
+    restart: unless-stopped
+    logging: *default-logging
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/docker-tc:/var/docker-tc
-    deploy:
-      mode: global
-      restart_policy:
-        condition: any
-    environment:
-      HTTP_BIND: "${HTTP_BIND:-127.0.0.1}"
-      HTTP_PORT: "${HTTP_PORT:-4080}"
-    network_mode: host
+      - ./data/yugabytedb-data:/root/var/data
+      - ./data/yugabytedb-logs:/root/var/logs

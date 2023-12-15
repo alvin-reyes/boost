@@ -3,9 +3,9 @@ package piecedirectory
 import (
 	"context"
 	"fmt"
-	"github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boost/extern/boostd-data/client"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/ipld/go-car/v2"
@@ -36,7 +36,7 @@ func testPieceDirectoryBlockstoreGetFuzz(ctx context.Context, t *testing.T, cl *
 	readers := make(map[abi.SectorNumber]car.SectionReader)
 	for i := 0; i < pieceCount; i++ {
 		// Create a random CAR file
-		carFilePath := CreateCarFile(t, i+1)
+		_, carFilePath := CreateCarFile(t, i+1)
 		carFile, err := os.Open(carFilePath)
 		require.NoError(t, err)
 		defer carFile.Close()

@@ -10,6 +10,43 @@
     padding: 0.5em 1em;
 }
 
+.lid .scan-progress {
+    margin-left: 1em;
+    margin-bottom: 2em;
+    padding-left: 2.5em;
+    background: url("./bootstrap-icons/icons/exclamation-circle.svg");
+    background-repeat: no-repeat;
+    background-position: 1em 1em;
+    border: 1px solid #777777;
+    border-radius: 1em;
+}
+
+.lid .scan-progress .scan-bar {
+    display: inline-block;
+    background-color: #b3b3b3;
+    height: 0.5em;
+    width: 200px;
+}
+.lid .scan-progress .scan-bar .completed {
+    background-color: rgb(44, 123, 229);
+    height: 0.5em;
+}
+.lid .scan-progress .scan-bar-label {
+    display: inline-block;
+    margin-left: 1em;
+    color: #777777;
+}
+.lid .scan-progress .last-updated {
+    font-size: 0.8em;
+    color: #777777;
+}
+
+.lid .last-scan {
+    margin-left: 1.5em;
+    font-size: 0.8em;
+    color: #777777;
+}
+
 .lid-graphs {
     margin-top: 2em;
     width: 100%;
@@ -45,5 +82,43 @@
 }
 
 .sectors-list-link a, .flagged-pieces-link a {
+    margin-left: 1em;
+}
+
+.payload-icon {
+    background-image: url("./bootstrap-icons/icons/list.svg");
+    background-position: left;
+    background-repeat: no-repeat;
+    padding-left: 1.25em;
+    margin-left: 1em;
+}
+
+.payloads {
+    padding-top: 1em;
+    margin: auto;
+}
+
+.payloads .title {
+    margin:  1em auto;
+    text-align: center;
+    font-size: 1.25em;
+    color: #a61e4d;
+}
+
+.payloads table{
+    font-size: 1em;
+}
+
+.payloads td, .payloads th {
+    vertical-align: top;
+    text-align: left;
+    padding: 0.5em 1em;
+}
+
+.payloads .download {
+    background-image: url("./bootstrap-icons/icons/download.svg");
+    background-position: left;
+    background-repeat: no-repeat;
+    padding-left: 1.25em;
     margin-left: 1em;
 }

@@ -17,7 +17,9 @@ import (
 	storageimpl "github.com/filecoin-project/boost-gfm/storagemarket/impl"
 	"github.com/filecoin-project/boost-gfm/storagemarket/impl/storedask"
 	"github.com/filecoin-project/boost-gfm/stores"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
@@ -34,6 +36,7 @@ import (
 	"github.com/filecoin-project/boost/piecedirectory"
 	brm "github.com/filecoin-project/boost/retrievalmarket/lib"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
+	"github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -42,7 +45,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/transport/httptransport"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/indexbs"
 	"github.com/filecoin-project/dagstore/shard"
@@ -312,6 +314,10 @@ func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
 	return db.NewDealsDB(sqldb)
 }
 
+func NewDirectDealsDB(sqldb *sql.DB) *db.DirectDealsDB {
+	return db.NewDirectDealsDB(sqldb)
+}
+
 func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
 	return db.NewLogsDB(logsSqlDB.db)
 }
@@ -338,6 +344,20 @@ func HandleRetrieval(host host.Host, lc fx.Lifecycle, m retrievalmarket.Retrieva
 	})
 }
 
+func HandleQueryAsk(lc fx.Lifecycle, h host.Host, maddr lotus_dtypes.MinerAddress, pd *piecedirectory.PieceDirectory, sa *lib.MultiMinerAccessor, askStore server.AskGetter, full v1api.FullNode) {
+	handler := server.NewQueryAskHandler(h, address.Address(maddr), pd, sa, askStore, full)
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			handler.Start()
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			handler.Stop()
+			return nil
+		},
+	})
+}
+
 func NewSectorStateDB(sqldb *sql.DB) *db.SectorStateDB {
 	return db.NewSectorStateDB(sqldb)
 }
@@ -358,8 +378,8 @@ func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, lsp gfm_storage
 	return nil
 }
 
-func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
-	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, ddprov *storagemarket.DirectDealsProvider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, ddprov *storagemarket.DirectDealsProvider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
 
 		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi, cfg.Dealmaking.EnableLegacyStorageDeals)
 
@@ -395,6 +415,14 @@ func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host
 				log.Info("starting boost index provider wrapper")
 				idxProv.Start(ctx)
 				log.Info("boost index provider wrapper started successfully")
+
+				// Start the Boost Direct Deals provider
+				log.Info("starting boost direct deals provider")
+				err = ddprov.Start(ctx)
+				if err != nil {
+					return fmt.Errorf("starting direct deals provider: %w", err)
+				}
+				log.Info("boost direct deals provider started successfully")
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
@@ -584,18 +612,27 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 	}
 }
 
-func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
+func NewCommpThrottle(cfg *config.Boost) func() storagemarket.CommpThrottle {
+	return func() storagemarket.CommpThrottle {
+		size := uint64(1)
+		if cfg.Dealmaking.MaxConcurrentLocalCommp > 1 {
+			size = cfg.Dealmaking.MaxConcurrentLocalCommp
+		}
+		return make(chan struct{}, size)
+	}
+}
+
+func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, commpt storagemarket.CommpThrottle, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks,
-		commpc types.CommpCalculator, sps sealingpipeline.API,
+		commpc types.CommpCalculator, commpt storagemarket.CommpThrottle, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
 		piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper,
 		lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 
 		prvCfg := storagemarket.Config{
-			MaxTransferDuration:     time.Duration(cfg.Dealmaking.MaxTransferDuration),
-			RemoteCommp:             cfg.Dealmaking.RemoteCommp,
-			MaxConcurrentLocalCommp: cfg.Dealmaking.MaxConcurrentLocalCommp,
+			MaxTransferDuration: time.Duration(cfg.Dealmaking.MaxTransferDuration),
+			RemoteCommp:         cfg.Dealmaking.RemoteCommp,
 			TransferLimiter: storagemarket.TransferLimiterConfig{
 				MaxConcurrent:    cfg.Dealmaking.HttpTransferMaxConcurrentDownloads,
 				StallCheckPeriod: time.Duration(cfg.Dealmaking.HttpTransferStallCheckPeriod),
@@ -606,9 +643,8 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 			SealingPipelineCacheTimeout: time.Duration(cfg.Dealmaking.SealingPipelineCacheTimeout),
 		}
 		dl := logs.NewDealLogger(logsDB)
-		tspt := httptransport.New(h, dl)
-		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc,
-			sps, cdm, df, logsSqlDB.db, logsDB, piecedirectory, ip, lp, &signatureVerifier{a}, dl, tspt)
+		tspt := httptransport.New(h, dl, httptransport.NChunksOpt(cfg.HttpDownload.NChunks), httptransport.AllowPrivateIPsOpt(cfg.HttpDownload.AllowPrivateIPs))
+		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc, commpt, sps, cdm, df, logsSqlDB.db, logsDB, piecedirectory, ip, lp, &signatureVerifier{a}, dl, tspt)
 		if err != nil {
 			return nil, err
 		}
@@ -617,16 +653,16 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 	}
 }
 
-func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, piecedirectory *piecedirectory.PieceDirectory, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg gql.BlockGetter, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor) *gql.Server {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
+func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps dtypes.ProviderPieceStore, piecedirectory *piecedirectory.PieceDirectory, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg gql.BlockGetter, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *gql.Server {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
 		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
 		legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer,
-		ps dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, piecedirectory *piecedirectory.PieceDirectory,
+		ps dtypes.ProviderPieceStore, piecedirectory *piecedirectory.PieceDirectory,
 		indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg gql.BlockGetter,
-		ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor) *gql.Server {
+		ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *gql.Server {
 
 		resolverCtx, cancel := context.WithCancel(context.Background())
-		resolver := gql.NewResolver(resolverCtx, cfg, r, h, dealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyDeals, legacyProv, legacyDT, ps, sa, piecedirectory, publisher, indexProv, idxProvWrapper, fullNode, ssm, mpool)
+		resolver := gql.NewResolver(resolverCtx, cfg, r, h, dealsDB, directDealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, ddProv, legacyDeals, legacyProv, legacyDT, ps, piecedirectory, publisher, indexProv, idxProvWrapper, fullNode, ssm, mpool, mma)
 		server := gql.NewServer(cfg, resolver, bg)
 
 		lc.Append(fx.Hook{

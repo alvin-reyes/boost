@@ -3,12 +3,12 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {
     LIDQuery,
     FlaggedPiecesQuery, PieceBuildIndexMutation,
-    PieceStatusQuery, PiecesWithPayloadCidQuery, PiecesWithRootPayloadCidQuery, FlaggedPiecesCountQuery
+    PieceStatusQuery, PiecesWithPayloadCidQuery, FlaggedPiecesCountQuery, PiecePayloadCidsQuery,
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
-import React, {useState} from "react";
-import {PageContainer, ShortDealLink} from "./Components";
+import React, {useState, useEffect} from "react";
+import {PageContainer, ShortCID, ShortDealLink} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import xImg from './bootstrap-icons/icons/x-lg.svg'
@@ -19,6 +19,7 @@ import {Pagination} from "./Pagination";
 import {Info, InfoListItem} from "./Info";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import {addCommas, humanFileSize} from "./util";
+import closeImg from "./bootstrap-icons/icons/x-circle.svg";
 
 const lidBasePath = '/piece-doctor'
 
@@ -49,23 +50,6 @@ function LIDContent() {
     }
 
     const d = data.lid
-
-    const dealDataBars = [{
-        name: 'Indexed',
-        className: 'indexed',
-        amount: d.DealData.Indexed,
-        description: ''
-    }, {
-        name: 'Flagged (unsealed)',
-        className: 'flagged',
-        amount: d.DealData.FlaggedUnsealed,
-        description: ''
-    }, {
-        name: 'Flagged (sealed only)',
-        className: 'sealed',
-        amount: d.DealData.FlaggedSealed,
-        description: ''
-    }]
 
     const piecesBars = [{
         name: 'Indexed',
@@ -108,67 +92,74 @@ function LIDContent() {
         description: ''
     }]
 
+    var lastScanMsg = ''
+    var lastScan = d.ScanProgress.LastScan
+    const now = new Date()
+    if (!lastScan) {
+        lastScan = now
+    }
+    if (lastScan > now) {
+        lastScanMsg = 'just now'
+    } else if (now.getTime() - lastScan.getTime() < 60 * 1000) {
+        lastScanMsg = 'just now'
+    } else {
+        lastScanMsg = moment(lastScan).fromNow() + ' ago'
+    }
     return <div className="lid">
-        <table className="lid-graphs">
-            <tbody>
-            <tr>
-                <td width="50%">
-                  <div>
-                      <h3>Pieces<PiecesInfo/></h3>
+      <div className="last-scan">
+          Last updated: {moment(lastScan).format(dateFormat)} ({lastScanMsg})
+      </div>
 
-                      <div className="storage-chart">
-                          <CumulativeBarChart bars={piecesBars} />
-                          <CumulativeBarLabels bars={piecesBars} />
-                      </div>
+      <h3>Pieces<PiecesInfo/></h3>
 
-                      <div className="flagged-pieces-link">
-                          <h3>
-                              Flagged Pieces
-                              <Info>
-                                  Flagged Pieces are pieces that have been flagged by the Piece Doctor because it was
-                                  not possible to index the piece data. This could be because there was no unsealed copy
-                                  of the piece data, or because the piece data was inaccessible or corrupted.
-                              </Info>
-                          </h3>
-                          <p>
-                              <b>{addCommas(d.FlaggedPieces)}</b> Flagged Pieces
-                              <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
-                          </p>
-                      </div>
+      <div className="storage-chart">
+          <CumulativeBarChart bars={piecesBars} />
+          <CumulativeBarLabels bars={piecesBars} />
+      </div>
 
-                      <div>
-                          <h3>
-                              Deal Sectors Copies
-                              <Info>
-                                  Deal Sectors Copies indicates how many sectors contain deals, and how many of those
-                                  sectors have an unsealed copy.
-                              </Info>
-                          </h3>
+      <div className="flagged-pieces-link">
+          <h3>
+              Flagged Pieces
+              <Info>
+                  Flagged Pieces are pieces that have been flagged by the Piece Doctor because it was
+                  not possible to index the piece data. This could be because there was no unsealed copy
+                  of the piece data, or because the piece data was inaccessible or corrupted.
+              </Info>
+          </h3>
+          <p>
+              <b>{addCommas(d.FlaggedPieces)}</b> Flagged Pieces
+              <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
+          </p>
+      </div>
 
-                          <div className="storage-chart">
-                              <CumulativeBarChart bars={barsSuc} />
-                              <CumulativeBarLabels bars={barsSuc} />
-                          </div>
-                      </div>
+      <div>
+          <h3>
+              Deal Sectors Copies
+              <Info>
+                  Deal Sectors Copies indicates how many sectors contain deals, and how many of those
+                  sectors have an unsealed copy.
+              </Info>
+          </h3>
 
-                      <div>
-                          <h3>
-                              Sectors Proving State
-                              <Info>
-                                Sectors Proving State indicates how many sectors this SP is actively proving on chain
-                              </Info>
-                          </h3>
+          <div className="storage-chart">
+              <CumulativeBarChart bars={barsSuc} />
+              <CumulativeBarLabels bars={barsSuc} />
+          </div>
+      </div>
 
-                          <div className="storage-chart">
-                              <CumulativeBarChart bars={barsSps} />
-                              <CumulativeBarLabels bars={barsSps} />
-                          </div>
-                      </div>
-                  </div>
-                </td>
-            </tr>
-            </tbody>
-        </table>
+      <div>
+          <h3>
+              Sectors Proving State
+              <Info>
+                Sectors Proving State indicates how many sectors this SP is actively proving on chain
+              </Info>
+          </h3>
+
+          <div className="storage-chart">
+              <CumulativeBarChart bars={barsSps} />
+              <CumulativeBarLabels bars={barsSps} />
+          </div>
+      </div>
     </div>
 }
 
@@ -501,31 +492,18 @@ function SearchResults({searchQuery, setSearchQuery, showSearchPrompt}) {
         skip: !searchQuery
     })
 
-    // Look up pieces by root payload cid
-    const rootPayloadRes = useQuery(PiecesWithRootPayloadCidQuery, {
-        variables: {
-            payloadCid: searchQuery
-        },
-        // Don't do this query if the search query is empty
-        skip: !searchQuery
-    })
-
-    // If the requests for payload CID & root payload CID have completed
+    // If the requests for payload CID have completed
     var pieceCid = null
     var pieceCids = []
-    if ((payloadRes || {}).data && (rootPayloadRes || {}).data) {
-        pieceCids = [...new Set([
-            ...payloadRes.data.piecesWithPayloadCid,
-            ...rootPayloadRes.data.piecesWithRootPayloadCid
-        ])]
-        if (pieceCids.length === 0) {
+    if ((payloadRes || {}).data) {
+        if (payloadRes.data.piecesWithPayloadCid.length === 0) {
             // If there were no results for the lookup by payload CID, use the search
             // query for a lookup by piece CID
             pieceCid = searchQuery
-        } else if (pieceCids.length === 1) {
+        } else if (payloadRes.data.piecesWithPayloadCid.length === 1) {
             // If there was exactly one result for the lookup by payload CID, use
             // the piece CID for the lookup by piece CID
-            pieceCid = pieceCids[0]
+            pieceCid = payloadRes.data.piecesWithPayloadCid[0]
         }
     }
 
@@ -539,7 +517,7 @@ function SearchResults({searchQuery, setSearchQuery, showSearchPrompt}) {
         skip: !pieceCid
     })
 
-    if ((pieceRes || {}).loading || (payloadRes || {}).loading || (rootPayloadRes || {}).loading) {
+    if ((pieceRes || {}).loading || (payloadRes || {}).loading) {
         return <div>Loading ...</div>
     }
 
@@ -628,9 +606,20 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                 <tr key="piece cid">
                     <th>Piece CID</th>
                     {searchIsPieceCid ? (
-                      <td><strong>{pieceCid}</strong></td>
+                      <td>
+                          <strong>{pieceCid}</strong>
+                          &nbsp;
+                          <a className="payload-icon" href={"/piece-doctor/piece-payload/"+pieceCid}>
+                              Payload CIDs
+                          </a>
+                      </td>
                     ) : (
-                      <td>{pieceCid}</td>
+                      <td>{pieceCid}
+                          &nbsp;
+                          <a className="payload-icon" href={"/piece-doctor/piece-payload/"+pieceCid}>
+                              Payload CIDs
+                          </a>
+                      </td>
                     )}
                 </tr>
                 <tr key="index status">
@@ -660,6 +649,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                 <table className="deals">
                     <tbody>
                     <tr>
+                        <th>Miner Address</th>
                         <th>Chain Deal ID</th>
                         <th>Sector Number</th>
                         <th>Piece Offset</th>
@@ -668,6 +658,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                     </tr>
                     {pieceStatus.PieceInfoDeals.map(deal => (
                         <tr key={deal.ChainDealID+''}>
+                            <td>{deal.MinerAddress+''}</td>
                             <td>{deal.ChainDealID+''}</td>
                             <td>{deal.Sector.ID+''}</td>
                             <td>{deal.Sector.Offset+''}</td>
@@ -708,7 +699,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                     </tbody>
                 </table>
             ) : (
-                <p>No deals found with piece CID {pieceCid}</p>
+                <p>No deals found with piece CID {pieceCid} on this miner</p>
             )}
         </div>
     </div>
@@ -783,4 +774,84 @@ const RowsPerPage = {
 
 function scrollTop() {
     window.scrollTo({ top: 0, behavior: "smooth" })
+}
+
+export function PiecePayloadCids() {
+    const params = useParams()
+    const navigate = useNavigate()
+
+    // Add a class to the document body when showing the ad detail page
+    useEffect(() => {
+        document.body.classList.add('modal-open')
+
+        return function () {
+            document.body.classList.remove('modal-open')
+        }
+    })
+
+    const {loading, error, data} = useQuery(PiecePayloadCidsQuery, {
+        variables: {pieceCid: params.pieceCID},
+    })
+
+    if (error) {
+        return <div className="payloads modal" id={params.pieceCID}>
+            <div className="content">
+                <div className="close" onClick={() => navigate(-1)}>
+                    <img className="icon" alt="" src={closeImg} />
+                </div>
+                <div className="title">
+                    <span>Payloads CIDs for {params.pieceCID}</span>
+                </div>
+                <div><span>Error: {error.message}</span></div>
+            </div>
+        </div>
+    }
+
+    if (loading) {
+        return <div>Loading ...</div>
+    }
+
+    var payload = data.piecePayloadCids
+    return <div className="payloads modal" id={params.pieceCID}>
+        <div className="content">
+            <div className="close" onClick={() => navigate(-1)}>
+                <img className="icon" alt="" src={closeImg} />
+            </div>
+            <div className="title">
+                <span>Payloads CIDs for {params.pieceCID}</span>
+            </div>
+            <div>
+                { payload.length === 0 ? (
+                    <span>Piece {params.pieceCID} either has no payload CIDs or is not indexed</span>
+                ) : (
+                    <table>
+                        <tbody>
+                        <tr>
+                            <th>Number</th>
+                            <th>Payload CID</th>
+                            <th>Multihash (Hexadecimal)</th>
+                            <th>Download Link</th>
+                        </tr>
+                        {payload.map((payload, i) => {
+                            return <tr key={payload.PayloadCid}>
+                                <td>{i+1}.</td>
+                                <td>
+                                    {payload.PayloadCid}
+                                </td>
+                                <td>
+                                    {payload.Multihash}
+                                </td>
+                                <td>
+                                    <a className="download" target="_blank" href={"/download/block/"+payload.PayloadCid}>
+                                        Download block
+                                    </a>
+                                </td>
+                            </tr>
+                        })}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+        </div>
+    </div>
 }

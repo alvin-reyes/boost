@@ -7,11 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
-	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
+	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
@@ -111,7 +114,11 @@ func (db *DB) NextCursor(ctx context.Context) (uint64, string, error) {
 	}
 
 	cursor, _ := binary.Uvarint(b)
-	return cursor, fmt.Sprintf("%d", cursor) + "/", nil // adding "/" because of Query method in go-datastore
+	return cursor, KeyCursorPrefix(cursor), nil // adding "/" because of Query method in go-datastore
+}
+
+func KeyCursorPrefix(cursor uint64) string {
+	return fmt.Sprintf("%d/", cursor)
 }
 
 // SetNextCursor
@@ -218,8 +225,12 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Reco
 	return nil
 }
 
+func pieceCidToFlaggedKey(maddr address.Address, pieceCid cid.Cid) ds.Key {
+	return datastore.NewKey(fmt.Sprintf("%s/%s/%s", sprefixPieceCidToFlagged, maddr.String(), pieceCid.String()))
+}
+
 // SetPieceCidToFlagged
-func (db *DB) SetPieceCidToFlagged(ctx context.Context, pieceCid cid.Cid, fm LeveldbFlaggedMetadata) error {
+func (db *DB) SetPieceCidToFlagged(ctx context.Context, pieceCid cid.Cid, maddr address.Address, fm LeveldbFlaggedMetadata) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.set_piece_cid_to_flagged")
 	defer span.End()
 
@@ -228,19 +239,17 @@ func (db *DB) SetPieceCidToFlagged(ctx context.Context, pieceCid cid.Cid, fm Lev
 		return err
 	}
 
-	key := datastore.NewKey(fmt.Sprintf("%s/%s", sprefixPieceCidToFlagged, pieceCid.String()))
-
+	key := pieceCidToFlaggedKey(maddr, pieceCid)
 	return db.Put(ctx, key, b)
 }
 
 // GetPieceCidToFlagged
-func (db *DB) GetPieceCidToFlagged(ctx context.Context, pieceCid cid.Cid) (LeveldbFlaggedMetadata, error) {
+func (db *DB) GetPieceCidToFlagged(ctx context.Context, pieceCid cid.Cid, maddr address.Address) (LeveldbFlaggedMetadata, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cid_to_flagged")
 	defer span.End()
 
 	var metadata LeveldbFlaggedMetadata
-
-	key := datastore.NewKey(fmt.Sprintf("%s/%s", sprefixPieceCidToFlagged, pieceCid.String()))
+	key := pieceCidToFlaggedKey(maddr, pieceCid)
 
 	b, err := db.Get(ctx, key)
 	if err != nil {
@@ -381,7 +390,8 @@ var (
 	offset int
 
 	// checked keeps track in memory when was the last time we processed a given piece cid
-	checked map[string]time.Time
+	checkedLk sync.Mutex
+	checked   map[string]time.Time
 
 	// batch limit for each NextPiecesToCheck call
 	PiecesToTrackerBatchSize = 1024
@@ -391,7 +401,7 @@ func init() {
 	checked = make(map[string]time.Time)
 }
 
-func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+func (db *DB) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.next_pieces_to_check")
 	defer span.End()
 
@@ -408,6 +418,7 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 
 	var pieceCids []cid.Cid
 
+	maddrStr := maddr.String()
 	now := time.Now()
 
 	var i int
@@ -419,21 +430,39 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 		i++
 
 		k := r.Key[len(q.Prefix):]
-		if t, ok := checked[k]; ok {
+		minerPiece := maddrStr + k
+		checkedLk.Lock()
+		t, ok := checked[minerPiece]
+		checkedLk.Unlock()
+		if ok {
 			alreadyChecked := t.After(now.Add(-MinPieceCheckPeriod))
 
 			if alreadyChecked {
 				continue
 			}
 		}
-		checked[k] = now
 
 		pieceCid, err := cid.Parse(k)
 		if err != nil {
 			return nil, fmt.Errorf("parsing piece cid '%s': %w", k, err)
 		}
 
-		pieceCids = append(pieceCids, pieceCid)
+		// Filter for pieces that match the miner address
+		md, err := db.GetPieceCidToMetadata(ctx, pieceCid)
+		if err != nil {
+			return nil, fmt.Errorf("getting piece metadata: %w", err)
+		}
+
+		for _, dl := range md.Deals {
+			if dl.MinerAddr == maddr {
+				checkedLk.Lock()
+				checked[minerPiece] = now
+				checkedLk.Unlock()
+
+				pieceCids = append(pieceCids, pieceCid)
+				break
+			}
+		}
 	}
 	offset += i
 
@@ -448,13 +477,14 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	return pieceCids, nil
 }
 
-func (db *DB) PiecesCount(ctx context.Context) (int, error) {
+// Get the number of pieces that have an associated deal on the given miner
+func (db *DB) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.pieces_count")
 	defer span.End()
 
 	q := query.Query{
 		Prefix:   "/" + sprefixPieceCidToCursor + "/",
-		KeysOnly: true,
+		KeysOnly: false,
 	}
 	results, err := db.Query(ctx, q)
 	if err != nil {
@@ -463,15 +493,58 @@ func (db *DB) PiecesCount(ctx context.Context) (int, error) {
 
 	var count int
 	for {
-		_, ok := results.NextSync()
+		r, ok := results.NextSync()
 		if !ok {
 			break
 		}
 
-		count++
+		k := r.Key[len(q.Prefix):]
+		pieceCid, err := cid.Parse(k)
+		if err != nil {
+			return 0, fmt.Errorf("parsing piece cid '%s': %w", k, err)
+		}
+
+		md, err := db.GetPieceCidToMetadata(ctx, pieceCid)
+		if err != nil {
+			return 0, fmt.Errorf("getting piece cid '%s' metadata: %w", k, err)
+		}
+
+		for _, dl := range md.Deals {
+			if dl.MinerAddr == maddr {
+				count++
+				break
+			}
+		}
 	}
 
 	return count, nil
+}
+
+func (db *DB) ScanProgress(ctx context.Context, maddr address.Address) (*types.ScanProgress, error) {
+	count, err := db.PiecesCount(ctx, maddr)
+	if err != nil {
+		return nil, err
+	}
+
+	checkedLk.Lock()
+	checkedCount := len(checked)
+	var lastScan time.Time
+	for _, t := range checked {
+		if t.After(lastScan) {
+			lastScan = t
+		}
+	}
+	checkedLk.Unlock()
+
+	progress := float64(1.0)
+	if count != 0 {
+		progress = float64(checkedCount) / float64(count)
+	}
+
+	return &types.ScanProgress{
+		Progress: progress,
+		LastScan: lastScan,
+	}, nil
 }
 
 func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
@@ -651,6 +724,7 @@ func (db *DB) ListFlaggedPieces(ctx context.Context, filter *types.FlaggedPieces
 		Prefix:   "/" + sprefixPieceCidToFlagged + "/",
 		KeysOnly: false,
 	}
+
 	results, err := db.Query(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("listing flagged pieces in database: %w", err)
@@ -663,7 +737,11 @@ func (db *DB) ListFlaggedPieces(ctx context.Context, filter *types.FlaggedPieces
 			break
 		}
 
-		k := r.Key[len(q.Prefix):]
+		parts := strings.Split(r.Key, "/")
+		if len(parts) == 0 {
+			return nil, fmt.Errorf("unexpected key format '%s'", r.Key)
+		}
+		k := parts[len(parts)-1]
 		pieceCid, err := cid.Parse(k)
 		if err != nil {
 			return nil, fmt.Errorf("parsing piece cid '%s': %w", k, err)
@@ -676,6 +754,10 @@ func (db *DB) ListFlaggedPieces(ctx context.Context, filter *types.FlaggedPieces
 		}
 
 		if filter != nil && filter.HasUnsealedCopy != v.HasUnsealedCopy {
+			continue
+		}
+
+		if filter != nil && !filter.MinerAddr.Empty() && filter.MinerAddr != v.MinerAddr {
 			continue
 		}
 
@@ -718,6 +800,7 @@ func (db *DB) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiece
 		Prefix:   "/" + sprefixPieceCidToFlagged + "/",
 		KeysOnly: filter == nil,
 	}
+
 	results, err := db.Query(ctx, q)
 	if err != nil {
 		return -1, fmt.Errorf("listing flagged pieces in database: %w", err)
@@ -740,6 +823,10 @@ func (db *DB) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiece
 			if filter.HasUnsealedCopy != v.HasUnsealedCopy {
 				continue
 			}
+
+			if !filter.MinerAddr.Empty() && filter.MinerAddr != v.MinerAddr {
+				continue
+			}
 		}
 
 		i++
@@ -749,11 +836,11 @@ func (db *DB) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiece
 }
 
 // DeletePieceCidToFlagged
-func (db *DB) DeletePieceCidToFlagged(ctx context.Context, pieceCid cid.Cid) error {
+func (db *DB) DeletePieceCidToFlagged(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.delete_piece_flagged_metadata")
 	defer span.End()
 
-	key := datastore.NewKey(fmt.Sprintf("%s/%s", sprefixPieceCidToFlagged, pieceCid.String()))
+	key := pieceCidToFlaggedKey(maddr, pieceCid)
 
 	// TODO: Requires DB compaction for removing the key
 	return db.Delete(ctx, key)
